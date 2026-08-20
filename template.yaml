@@ -571,6 +571,8 @@ Resources:
 
           chown -R apache:apache /var/www/html
           chmod -R 755 /var/www/html
+
+          sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
           systemctl restart httpd
 
   # ============================================================================
@@ -683,6 +685,8 @@ Resources:
 
             chown -R apache:apache /var/www/html
             chmod -R 755 /var/www/html
+
+            sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
             systemctl restart httpd
 
   # Auto Scaling Group Front End (mbg-asg-fe) di Subnet Private FE
