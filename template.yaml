@@ -50,7 +50,7 @@ Parameters:
 
   StudentIdentifier:
     Type: String
-    Default: ukkce2627
+    Default: '15671'
     Description: 'NIS / Username peserta untuk penamaan global unik S3'
 
 Resources:
@@ -385,7 +385,7 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
-      BucketName: !Sub 'mbg-uploads-${AWS::AccountId}-${StudentIdentifier}-${AWS::Region}'
+      BucketName: !Sub 'mbg-uploads-${StudentIdentifier}-${AWS::AccountId}-${AWS::Region}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -393,7 +393,7 @@ Resources:
         RestrictPublicBuckets: true
       Tags:
         - Key: Name
-          Value: !Sub 'mbg-uploads-${AWS::AccountId}-${StudentIdentifier}-${AWS::Region}'
+          Value: !Sub 'mbg-uploads-${StudentIdentifier}-${AWS::AccountId}-${AWS::Region}'
 
   # ============================================================================
   # C.7 & D.5: SNS Topic & Email Subscription
