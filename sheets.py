@@ -49,7 +49,7 @@ class GoogleSheetsManager:
             return False
 
     def get_participants(self) -> List[Dict[str, Any]]:
-        """Read all rows from PESERTA sheet."""
+        """Read all rows from PESERTA sheet and parse credentials."""
         if not self.is_connected:
             # Fallback default participant for standalone testing
             return [
@@ -59,15 +59,55 @@ class GoogleSheetsManager:
                     "Nama": "Fendy Ramadhani",
                     "NIS": "15671",
                     "Status Pemeriksaan": "WAITING",
+                    "aws_access_key_id": None,
+                    "aws_secret_access_key": None,
+                    "aws_session_token": None,
                 }
             ]
 
         try:
             sheet = self.spreadsheet.worksheet(SHEET_PESERTA)
             records = sheet.get_all_records()
+            participants = []
+
             for idx, r in enumerate(records, start=2):
                 r["row_index"] = idx
-            return records
+                
+                # Extract Credentials flexibly
+                access_key = None
+                secret_key = None
+                session_token = None
+
+                # 1. Check direct separate columns
+                for k, v in r.items():
+                    key_lower = k.lower().replace(" ", "_").replace("-", "_")
+                    val_str = str(v).strip()
+                    if "access_key" in key_lower and "secret" not in key_lower:
+                        access_key = val_str
+                    elif "secret" in key_lower:
+                        secret_key = val_str
+                    elif "session_token" in key_lower or "token" in key_lower:
+                        session_token = val_str
+
+                # 2. Check if student pasted entire AWS Details block in one field
+                for k, v in r.items():
+                    val_str = str(v)
+                    if "aws_access_key_id" in val_str:
+                        for line in val_str.splitlines():
+                            line = line.strip()
+                            if line.startswith("aws_access_key_id"):
+                                access_key = line.split("=", 1)[-1].strip()
+                            elif line.startswith("aws_secret_access_key"):
+                                secret_key = line.split("=", 1)[-1].strip()
+                            elif line.startswith("aws_session_token"):
+                                session_token = line.split("=", 1)[-1].strip()
+
+                r["aws_access_key_id"] = access_key
+                r["aws_secret_access_key"] = secret_key
+                r["aws_session_token"] = session_token
+                participants.append(r)
+
+            return participants
         except Exception as e:
             print(f"[Sheets] Error reading PESERTA sheet: {e}")
             return []

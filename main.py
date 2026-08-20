@@ -38,22 +38,11 @@ def main():
     args = parse_arguments()
     print_banner()
 
-    # 1. Initialize AWS Session
-    aws = AWSSessionManager(profile_name=args.profile, region_name=args.region)
-    auth_result = aws.initialize()
-
-    if not auth_result["success"]:
-        print(f"[FATAL] Gagal mengautentikasi AWS: {auth_result['error']}")
-        sys.exit(1)
-
-    account_id = auth_result["account_id"]
-    print(f"AWS Authenticated: Account {account_id} ({auth_result['arn']})")
-
-    # 2. Connect to Google Sheets
+    # 1. Connect to Google Sheets
     sheets = GoogleSheetsManager(spreadsheet_id=args.spreadsheet_id)
     sheets.connect()
 
-    # 3. Load Participants
+    # 2. Load Participants from Spreadsheet
     participants = sheets.get_participants()
     if not participants:
         print("[INFO] Tidak ada data peserta yang ditemukan.")
@@ -67,7 +56,7 @@ def main():
             return
 
     total_participants = len(participants)
-    print(f"[INFO] Memproses {total_participants} peserta...\n")
+    print(f"[INFO] Memproses {total_participants} peserta dari Spreadsheet...\n")
 
     scoring_engine = ScoringEngine()
 
@@ -77,7 +66,7 @@ def main():
     all_summaries: List[Dict[str, Any]] = []
     all_details: List[Dict[str, Any]] = []
 
-    # 4. Batch Processing Loop
+    # 3. Batch Processing Loop
     for idx, p in enumerate(participants, start=1):
         nama = p.get("Nama", "Peserta")
         nis = str(p.get("NIS", ""))
@@ -89,6 +78,24 @@ def main():
             print(f"[{idx}/{total_participants}] {nama} (NIS: {nis}) -> Sudah DINILAI (SKIP)")
             continue
 
+        # Authenticate using this specific participant's credentials from Spreadsheet
+        aws = AWSSessionManager(
+            aws_access_key_id=p.get("aws_access_key_id"),
+            aws_secret_access_key=p.get("aws_secret_access_key"),
+            aws_session_token=p.get("aws_session_token"),
+            profile_name=args.profile,
+            region_name=args.region,
+        )
+        auth_result = aws.initialize()
+
+        if not auth_result["success"]:
+            batch_errors += 1
+            print_participant_header(idx, total_participants, nama, nis, "AUTH_FAILED", args.region)
+            print(f"[ERROR] Credential AWS tidak valid untuk {nama}: {auth_result['error']}\n")
+            sheets.update_participant_status(row_idx, "ERROR")
+            continue
+
+        account_id = auth_result["account_id"]
         print_participant_header(idx, total_participants, nama, nis, account_id, args.region)
         sheets.update_participant_status(row_idx, "RUNNING")
         start_time = datetime.now()

@@ -1,5 +1,6 @@
 """
 AWS Session management and STS validation.
+Supports temporary credentials (Access Key, Secret Key, Session Token) for AWS Academy Learner Lab.
 """
 from typing import Dict, Any, Optional
 import boto3
@@ -9,7 +10,17 @@ from config import DEFAULT_REGION
 
 
 class AWSSessionManager:
-    def __init__(self, profile_name: Optional[str] = None, region_name: str = DEFAULT_REGION):
+    def __init__(
+        self,
+        aws_access_key_id: Optional[str] = None,
+        aws_secret_access_key: Optional[str] = None,
+        aws_session_token: Optional[str] = None,
+        profile_name: Optional[str] = None,
+        region_name: str = DEFAULT_REGION,
+    ):
+        self.aws_access_key_id = aws_access_key_id.strip() if aws_access_key_id else None
+        self.aws_secret_access_key = aws_secret_access_key.strip() if aws_secret_access_key else None
+        self.aws_session_token = aws_session_token.strip() if aws_session_token else None
         self.profile_name = profile_name
         self.region_name = region_name
         self.session = None
@@ -20,8 +31,18 @@ class AWSSessionManager:
     def initialize(self) -> Dict[str, Any]:
         """Create boto3 session and validate STS caller identity."""
         try:
-            if self.profile_name:
+            # 1. Direct credentials from participant (AWS Academy Learner Lab)
+            if self.aws_access_key_id and self.aws_secret_access_key:
+                self.session = boto3.Session(
+                    aws_access_key_id=self.aws_access_key_id,
+                    aws_secret_access_key=self.aws_secret_access_key,
+                    aws_session_token=self.aws_session_token,
+                    region_name=self.region_name,
+                )
+            # 2. Local profile if specified
+            elif self.profile_name:
                 self.session = boto3.Session(profile_name=self.profile_name, region_name=self.region_name)
+            # 3. Default environment credentials
             else:
                 self.session = boto3.Session(region_name=self.region_name)
 
@@ -41,12 +62,12 @@ class AWSSessionManager:
         except NoCredentialsError:
             return {
                 "success": False,
-                "error": "No AWS credentials found. Configure via 'aws configure' or environment variables.",
+                "error": "No AWS credentials found for this participant.",
             }
         except ClientError as e:
             return {
                 "success": False,
-                "error": f"STS Authentication Error: {e}",
+                "error": f"STS Authentication Error (Credential expired or invalid): {e}",
             }
         except Exception as e:
             return {
