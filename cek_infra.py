@@ -1578,3 +1578,73 @@ class InfrastructureChecker:
                 error_message=str(e),
             ))
         return results
+
+
+if __name__ == "__main__":
+    import argparse
+    from aws_session import AWSSessionManager
+
+    parser = argparse.ArgumentParser(description="UKK AWS Infrastructure Grader (Standalone)")
+    parser.add_argument("--nis", default="15671", help="NIS peserta untuk pencarian S3 bucket")
+    parser.add_argument("--profile", default=None, help="AWS Profile name")
+    parser.add_argument("--region", default="us-east-1", help="AWS Region (default: us-east-1)")
+    args = parser.parse_args()
+
+    print("\n" + "=" * 55)
+    print("       UKK AWS INFRASTRUCTURE CHECKER (STANDALONE)")
+    print("=" * 55)
+
+    aws = AWSSessionManager(profile_name=args.profile, region_name=args.region)
+    auth = aws.initialize()
+
+    if not auth["success"]:
+        print(f"\n[!] AWS Auth gagal: {auth['error']}")
+        print("[i] Masukkan credential AWS Academy Anda sekarang:")
+        acc_key = input("AWS Access Key ID     : ").strip()
+        sec_key = input("AWS Secret Access Key : ").strip()
+        tok = input("AWS Session Token     : ").strip()
+
+        aws = AWSSessionManager(
+            aws_access_key_id=acc_key,
+            aws_secret_access_key=sec_key,
+            aws_session_token=tok,
+            region_name=args.region,
+        )
+        auth = aws.initialize()
+        if not auth["success"]:
+            print(f"\n[FATAL] Gagal login ke AWS: {auth['error']}")
+            exit(1)
+
+    print(f"\n[✓] AWS Account : {auth['account_id']}")
+    print(f"[✓] Region      : {auth['region']}\n")
+    print("Memulai pemeriksaan infrastruktur AWS...\n" + "-" * 55)
+
+    checker = InfrastructureChecker(aws)
+    results = checker.run_all_checks(nis=args.nis)
+
+    total_score = 0.0
+    max_total = 0.0
+    pass_cnt = 0
+    fail_cnt = 0
+
+    for r in results:
+        passed = r["status"] == "PASS"
+        icon = "\033[92m✓\033[0m" if passed else "\033[91m✗\033[0m"
+        score_str = f"({r['score']}/{r['max_score']})"
+        total_score += r["score"]
+        max_total += r["max_score"]
+
+        if passed:
+            pass_cnt += 1
+            print(f"  {icon} {r['component']:<30} {score_str}")
+        else:
+            fail_cnt += 1
+            err_msg = r.get("error_message") or r.get("error_code")
+            print(f"  {icon} {r['component']:<30} {score_str} -> \033[93m{err_msg}\033[0m")
+
+    final_pct = (total_score / max_total * 100) if max_total > 0 else 0.0
+    print("-" * 55)
+    print(f"HASIL INFRASTRUKTUR:")
+    print(f"  Total Score : {total_score:.1f} / {max_total:.1f} ({final_pct:.1f}%)")
+    print(f"  Status      : \033[92mPASS\033[0m" if final_pct >= 75 else f"  Status      : \033[91mFAIL\033[0m")
+    print("=" * 55 + "\n")

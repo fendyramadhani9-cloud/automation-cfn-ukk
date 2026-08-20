@@ -526,3 +526,90 @@ class FunctionalChecker:
             ))
 
         return results
+
+
+if __name__ == "__main__":
+    import argparse
+    from aws_session import AWSSessionManager
+    from cek_infra import InfrastructureChecker
+
+    parser = argparse.ArgumentParser(description="UKK AWS Application Function Checker (Standalone)")
+    parser.add_argument("--profile", default=None, help="AWS Profile name")
+    parser.add_argument("--region", default="us-east-1", help="AWS Region (default: us-east-1)")
+    parser.add_argument("--alb-dns", default=None, help="ALB DNS Name (optional, will auto-discover if not specified)")
+    parser.add_argument("--destructive", action="store_true", help="Run destructive test (Terminate 1 FE instance)")
+    args = parser.parse_args()
+
+    print("\n" + "=" * 55)
+    print("       UKK AWS FUNCTION CHECKER (STANDALONE)")
+    print("=" * 55)
+
+    aws = AWSSessionManager(profile_name=args.profile, region_name=args.region)
+    auth = aws.initialize()
+
+    if not auth["success"]:
+        print(f"\n[!] AWS Auth gagal: {auth['error']}")
+        print("[i] Masukkan credential AWS Academy Anda sekarang:")
+        acc_key = input("AWS Access Key ID     : ").strip()
+        sec_key = input("AWS Secret Access Key : ").strip()
+        tok = input("AWS Session Token     : ").strip()
+
+        aws = AWSSessionManager(
+            aws_access_key_id=acc_key,
+            aws_secret_access_key=sec_key,
+            aws_session_token=tok,
+            region_name=args.region,
+        )
+        auth = aws.initialize()
+        if not auth["success"]:
+            print(f"\n[FATAL] Gagal login ke AWS: {auth['error']}")
+            exit(1)
+
+    print(f"\n[✓] AWS Account : {auth['account_id']}")
+    print(f"[✓] Region      : {auth['region']}")
+
+    # Quick discovery of ALB DNS, RDS, S3, SNS
+    infra = InfrastructureChecker(aws)
+    infra.run_all_checks()
+    context = infra.context
+
+    if args.alb_dns:
+        context["alb_dns_name"] = args.alb_dns
+
+    print(f"[✓] ALB DNS     : {context.get('alb_dns_name', 'Not Found')}")
+    print(f"[✓] S3 Bucket   : {context.get('s3_bucket', 'Not Found')}")
+    print(f"[✓] SNS Topic   : {context.get('sns_topic_arn', 'Not Found')}\n")
+    print("Memulai pengujian fungsional aplikasi...\n" + "-" * 55)
+
+    checker = FunctionalChecker(aws_session=aws, infra_context=context, destructive_mode=args.destructive)
+    results = checker.run_all_checks()
+
+    total_score = 0.0
+    max_total = 0.0
+
+    for r in results:
+        passed = r["status"] == "PASS"
+        is_warn = r["status"] == "WARN"
+        if passed:
+            icon = "\033[92m✓\033[0m"
+        elif is_warn:
+            icon = "\033[93m⚠\033[0m"
+        else:
+            icon = "\033[91m✗\033[0m"
+
+        score_str = f"({r['score']}/{r['max_score']})"
+        total_score += r["score"]
+        max_total += r["max_score"]
+
+        if passed:
+            print(f"  {icon} {r['component']:<30} {score_str}")
+        else:
+            msg = r.get("error_message") or r.get("error_code")
+            print(f"  {icon} {r['component']:<30} {score_str} -> \033[93m{msg}\033[0m")
+
+    final_pct = (total_score / max_total * 100) if max_total > 0 else 0.0
+    print("-" * 55)
+    print(f"HASIL FUNGSIONAL:")
+    print(f"  Total Score : {total_score:.1f} / {max_total:.1f} ({final_pct:.1f}%)")
+    print(f"  Status      : \033[92mPASS\033[0m" if final_pct >= 75 else f"  Status      : \033[91mFAIL\033[0m")
+    print("=" * 55 + "\n")
