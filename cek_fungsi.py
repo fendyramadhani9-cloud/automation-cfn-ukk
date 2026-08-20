@@ -6,7 +6,11 @@ import time
 import json
 import requests
 from typing import Dict, Any, List, Optional
-import pymysql
+
+try:
+    import pymysql
+except ImportError:
+    pymysql = None
 
 from utils.validators import make_result
 from config import REQUIRED_DB_TABLES

@@ -6,6 +6,11 @@ Includes local fallback mode if service account is not provided.
 import os
 from typing import List, Dict, Any, Optional
 
+try:
+    import gspread
+except ImportError:
+    gspread = None
+
 from config import (
     SPREADSHEET_ID,
     SHEET_PESERTA,
@@ -25,12 +30,15 @@ class GoogleSheetsManager:
 
     def connect(self) -> bool:
         """Authenticate and open Google Spreadsheet."""
+        if gspread is None:
+            print("[Sheets] Module 'gspread' belum terinstall (jalankan: pip install -r requirements.txt). Menggunakan mode Lokal.")
+            return False
+
         if not os.path.exists(self.creds_file):
             print(f"[Sheets] '{self.creds_file}' tidak ditemukan. Menggunakan mode Lokal.")
             return False
 
         try:
-            import gspread
             self.client = gspread.service_account(filename=self.creds_file)
             self.spreadsheet = self.client.open_by_key(self.spreadsheet_id)
             self.is_connected = True
