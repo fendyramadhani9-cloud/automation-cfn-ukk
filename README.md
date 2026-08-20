@@ -5,7 +5,7 @@ File template CloudFormation: [`template.yaml`](file:///d:/Projects/Cloud/AWS/mb
 
 ---
 
-## 📌 Ringkasan Resource Lengkap (Full Architecture)
+##  Ringkasan Resource Lengkap (Full Architecture)
 
 Template ini telah mengotomatiskan pembangunan arsitektur secara menyeluruh (End-to-End) sesuai seluruh tabel Bab C dan petunjuk Bab D:
 
@@ -53,7 +53,7 @@ Template ini telah mengotomatiskan pembangunan arsitektur secara menyeluruh (End
 
 ---
 
-## 🚀 Cara Deploy di AWS CloudFormation
+##  Cara Deploy di AWS CloudFormation
 
 1. Buka AWS CloudFormation di Region **us-east-1**.
 2. Upload file [`template.yaml`](file:///d:/Projects/Cloud/AWS/mbg%20-cfn/template.yaml).
@@ -63,7 +63,7 @@ Template ini telah mengotomatiskan pembangunan arsitektur secara menyeluruh (End
 
 ---
 
-## 🧪 Verifikasi Pengujian (Bab D.9)
+##  Verifikasi Pengujian (Bab D.9)
 
 1. **Akses Dashboard Publik**: Buka `http://<ALBDNSName>/` di browser Anda (didapatkan dari Outputs `ALBDNSName`).
 2. **Login & Upload**: Login sebagai role masyarakat/sppg/bgn dan uji upload foto laporan/aduan.
