@@ -479,6 +479,7 @@ Resources:
           cd /var/www/html
           rm -rf * .* 2>/dev/null || true
           git clone https://github.com/ukkce2627/mbg-app-be .
+          export COMPOSER_ALLOW_SUPERUSER=1
           composer require aws/aws-sdk-php --no-interaction
 
           cat << 'EOF_CONFIG' > /var/www/html/config.php
