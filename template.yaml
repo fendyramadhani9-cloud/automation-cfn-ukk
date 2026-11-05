@@ -7,11 +7,6 @@ Description: >
   dan EC2 Frontend (Pre-Production di Public Subnet untuk persiapan pembuatan AMI).
 
 Parameters:
-  EnvironmentName:
-    Type: String
-    Default: mbg
-    Description: 'Prefix nama project / environment'
-
   LatestAmiId:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
@@ -333,7 +328,12 @@ Resources:
           FromPort: 2049
           ToPort: 2049
           CidrIp: 0.0.0.0/0
-          Description: Allow NFS access for EFS
+          Description: Allow NFS access for EFS from anywhere
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref SecurityGroupFe
+          Description: Allow NFS access for EFS from FE Security Group
       Tags:
         - Key: Name
           Value: mbg-sg-efs
@@ -359,7 +359,6 @@ Resources:
     Properties:
       DBInstanceIdentifier: mbg-rds-mysql
       Engine: mysql
-      EngineVersion: '8.0'
       DBInstanceClass: db.t3.micro
       AllocatedStorage: '20'
       StorageType: gp2
@@ -385,7 +384,7 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
-      BucketName: !Sub 'mbg-uploads-${StudentIdentifier}-${AWS::AccountId}-${AWS::Region}'
+      BucketName: !Sub 'mbg-uploads-${StudentIdentifier}-${AWS::AccountId}-${AWS::Region}-an'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -393,7 +392,7 @@ Resources:
         RestrictPublicBuckets: true
       Tags:
         - Key: Name
-          Value: !Sub 'mbg-uploads-${StudentIdentifier}-${AWS::AccountId}-${AWS::Region}'
+          Value: !Sub 'mbg-uploads-${StudentIdentifier}-${AWS::AccountId}-${AWS::Region}-an'
 
   # ============================================================================
   # C.7 & D.5: SNS Topic & Email Subscription
@@ -450,8 +449,6 @@ Resources:
     Type: AWS::EC2::Instance
     DependsOn:
       - PrivateRoute
-      - RDSInstance
-      - S3Bucket
     Properties:
       InstanceType: !Ref InstanceType
       ImageId: !Ref LatestAmiId
@@ -468,7 +465,7 @@ Resources:
           #!/bin/bash
           hostnamectl set-hostname mbg-ec2-be
           dnf update -y
-          dnf install php git httpd php-mysqlnd composer awscli -y
+          dnf install -y php php-cli php-mysqlnd php-xml php-mbstring php-curl php-zip unzip git httpd composer awscli
           systemctl start httpd
           systemctl enable httpd
 
@@ -511,6 +508,11 @@ Resources:
           sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
           systemctl restart httpd
 
+          # Tunggu RDS siap menerima koneksi, lalu inisialisasi auto-migration & seed data awal
+          for i in {1..30}; do
+            php /var/www/html/seed_users.php && break || sleep 5
+          done
+
   # ============================================================================
   # C.10: EC2 - Front End (Test / Pre-Production Stage di Public Subnet)
   # Untuk persiapan konfigurasi, uji coba, dan pembuatan AMI (mbg-ami-fe)
@@ -519,10 +521,8 @@ Resources:
     Type: AWS::EC2::Instance
     DependsOn:
       - PublicRoute
-      - EFSFileSystem
       - EFSMountTarget1a
       - EFSMountTarget1b
-      - EC2Backend
     Properties:
       InstanceType: !Ref InstanceType
       ImageId: !Ref LatestAmiId
@@ -539,7 +539,7 @@ Resources:
           #!/bin/bash
           hostnamectl set-hostname mbg-ec2-fe
           dnf update -y
-          dnf install php git httpd amazon-efs-utils nfs-utils composer -y
+          dnf install -y php php-cli php-mbstring php-curl git httpd amazon-efs-utils nfs-utils composer
           systemctl start httpd
           systemctl enable httpd
 
@@ -634,7 +634,6 @@ Resources:
     DependsOn:
       - EFSMountTarget1a
       - EFSMountTarget1b
-      - EC2Backend
     Properties:
       LaunchTemplateName: mbg-lt-fe
       LaunchTemplateData:
@@ -643,8 +642,11 @@ Resources:
         KeyName: !Ref KeyName
         IamInstanceProfile:
           Name: LabInstanceProfile
-        SecurityGroupIds:
-          - !Ref SecurityGroupFe
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: false
+            Groups:
+              - !Ref SecurityGroupFe
         TagSpecifications:
           - ResourceType: instance
             Tags:
@@ -655,7 +657,7 @@ Resources:
             #!/bin/bash
             hostnamectl set-hostname mbg-ec2-fe
             dnf update -y
-            dnf install php git httpd amazon-efs-utils nfs-utils composer -y
+            dnf install -y php php-cli php-mbstring php-curl git httpd amazon-efs-utils nfs-utils composer
             systemctl start httpd
             systemctl enable httpd
 
@@ -695,9 +697,7 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     DependsOn:
       - PrivateRoute
-      - TargetGroupFe
       - ALBListener
-      - LaunchTemplateFe
     Properties:
       AutoScalingGroupName: mbg-asg-fe
       VPCZoneIdentifier:
