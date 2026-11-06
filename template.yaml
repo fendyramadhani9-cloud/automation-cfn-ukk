@@ -1,10 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  CloudFormation Template - UKK Cloud Engineer SMKN 1 Banyumas TA. 2026/2027
+  CloudFormation Template - UKK Cloud Engineer SMKN 1 Banyumas TA. 2026/2027 (Revisi 1)
   Studi Kasus: Sistem Pelaporan, Monitoring & Aduan Program MBG.
   Deploy infrastruktur VPC, Subnets, IGW, NAT GW, Route Tables, Security Groups,
   RDS MySQL, S3 Bucket, SNS Topic, EFS File System & Mount Targets, EC2 Backend,
-  dan EC2 Frontend (Pre-Production di Public Subnet untuk persiapan pembuatan AMI).
+  dan EC2 Frontend Sementara (mbg-ec2-fe-temp di Subnet Private FE untuk persiapan pembuatan AMI mbg-ami-fe).
 
 Parameters:
   LatestAmiId:
@@ -514,30 +514,30 @@ Resources:
           done
 
   # ============================================================================
-  # C.10: EC2 - Front End (Test / Pre-Production Stage di Public Subnet)
-  # Untuk persiapan konfigurasi, uji coba, dan pembuatan AMI (mbg-ami-fe)
+  # C.9: EC2 - Front End Sementara (Test/Pre-Production di Subnet Private FE 1a)
+  # Dasar pembuatan AMI mbg-ami-fe sesuai Bab C.9 & D.7 Revisi 1
   # ============================================================================
   EC2FrontendPreProd:
     Type: AWS::EC2::Instance
     DependsOn:
-      - PublicRoute
+      - PrivateRoute
       - EFSMountTarget1a
       - EFSMountTarget1b
     Properties:
       InstanceType: !Ref InstanceType
       ImageId: !Ref LatestAmiId
       KeyName: !Ref KeyName
-      SubnetId: !Ref SubnetPublicAlb1a
+      SubnetId: !Ref SubnetPrivateFe1a
       SecurityGroupIds:
         - !Ref SecurityGroupFe
       IamInstanceProfile: LabInstanceProfile
       Tags:
         - Key: Name
-          Value: mbg-ec2-fe
+          Value: mbg-ec2-fe-temp
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          hostnamectl set-hostname mbg-ec2-fe
+          hostnamectl set-hostname mbg-ec2-fe-temp
           dnf update -y
           dnf install -y php php-cli php-mbstring php-curl git httpd amazon-efs-utils nfs-utils composer
           systemctl start httpd
@@ -566,9 +566,10 @@ Resources:
           ];
           EOF_CONFIG
 
-          # Setting session.save_path di php.ini juga
+          # Setting session.save_path di php.ini dan php.d agar terbaca CLI & httpd
           sed -i 's|;session.save_path = "/tmp"|session.save_path = "/mnt/efs/mbg-session"|g' /etc/php.ini
           sed -i 's|session.save_path = "/var/lib/php/session"|session.save_path = "/mnt/efs/mbg-session"|g' /etc/php.ini
+          echo 'session.save_path = "/mnt/efs/mbg-session"' > /etc/php.d/99-session.ini
 
           chown -R apache:apache /var/www/html
           chmod -R 755 /var/www/html
@@ -685,6 +686,7 @@ Resources:
 
             sed -i 's|;session.save_path = "/tmp"|session.save_path = "/mnt/efs/mbg-session"|g' /etc/php.ini
             sed -i 's|session.save_path = "/var/lib/php/session"|session.save_path = "/mnt/efs/mbg-session"|g' /etc/php.ini
+            echo 'session.save_path = "/mnt/efs/mbg-session"' > /etc/php.d/99-session.ini
 
             chown -R apache:apache /var/www/html
             chmod -R 755 /var/www/html
@@ -773,10 +775,6 @@ Outputs:
     Description: 'EFS File System ID (mbg-efs-fe-session)'
     Value: !Ref EFSFileSystem
 
-  EC2FrontendPreProdPublicIp:
-    Description: 'EC2 FE Pre-Production Public IP (mbg-ec2-fe di public subnet)'
-    Value: !GetAtt EC2FrontendPreProd.PublicIp
-
-  EC2FrontendPreProdPrivateIp:
-    Description: 'EC2 FE Pre-Production Private IP (mbg-ec2-fe)'
+  EC2FrontendTempPrivateIp:
+    Description: 'EC2 FE Temp Private IP (mbg-ec2-fe-temp di private subnet)'
     Value: !GetAtt EC2FrontendPreProd.PrivateIp

@@ -217,8 +217,17 @@ def main():
     check("UserData BE: buat folder prefix S3 aduan/ dan laporan/", "put-object --bucket ${S3Bucket} --key aduan/" in be_ud and "put-object --bucket ${S3Bucket} --key laporan/" in be_ud)
     check("UserData BE: auto-migration & seeding data awal (seed_users.php)", "seed_users.php" in be_ud)
 
-    # 10. Launch Template Front End
-    print(f"\n{BOLD}[10] Launch Template Front End (Bab C.11 & grade.py){RESET}")
+    # 10. EC2 Frontend Sementara (Bab C.9 Revisi 1)
+    print(f"\n{BOLD}[10] EC2 Frontend Sementara (Bab C.9 Revisi 1){RESET}")
+    fe_temp = res.get("EC2FrontendPreProd", {})
+    check("EC2 Frontend Sementara Tag Name mbg-ec2-fe-temp", get_tag(fe_temp) == "mbg-ec2-fe-temp")
+    check("EC2 Frontend Sementara di Subnet Private FE 1a", fe_temp.get("Properties", {}).get("SubnetId") == {"Ref": "SubnetPrivateFe1a"})
+    check("EC2 Frontend Sementara Security Group mbg-sg-fe", fe_temp.get("Properties", {}).get("SecurityGroupIds") == [{"Ref": "SecurityGroupFe"}])
+    fe_temp_ud = fe_temp.get("Properties", {}).get("UserData", {}).get("Fn::Base64", {}).get("Sub", "")
+    check("UserData FE Temp: hostname mbg-ec2-fe-temp & mount EFS", "mbg-ec2-fe-temp" in fe_temp_ud and "mount -t efs" in fe_temp_ud)
+
+    # 11. Launch Template Front End
+    print(f"\n{BOLD}[11] Launch Template Front End (Bab C.10 Revisi 1 & grade.py){RESET}")
     lt = res.get("LaunchTemplateFe", {})
     lt_props = lt.get("Properties", {})
     lt_data = lt_props.get("LaunchTemplateData", {})
@@ -243,8 +252,8 @@ def main():
     check("UserData FE: config.php session_save_path & php.ini diarahkan", "session.save_path" in fe_ud)
     check("UserData FE: clone repo mbg-app-fe", "git clone https://github.com/ukkce2627/mbg-app-fe" in fe_ud)
 
-    # 11. Target Group, ALB, ASG & Policy
-    print(f"\n{BOLD}[11] Target Group, ALB, ASG & Scaling Policy (Bab C.11){RESET}")
+    # 12. Target Group, ALB, ASG & Policy
+    print(f"\n{BOLD}[12] Target Group, ALB, ASG & Scaling Policy (Bab C.10 Revisi 1){RESET}")
     tg = res.get("TargetGroupFe", {})
     check("Target Group Name mbg-tg-fe", tg.get("Properties", {}).get("Name") == "mbg-tg-fe")
     check("Target Group Protocol HTTP:80", tg.get("Properties", {}).get("Protocol") == "HTTP" and tg.get("Properties", {}).get("Port") == 80)
@@ -273,10 +282,11 @@ def main():
           tt.get("PredefinedMetricSpecification", {}).get("PredefinedMetricType") == "ASGAverageCPUUtilization" and
           float(tt.get("TargetValue", 0)) == 60.0)
 
-    # 12. Outputs
-    print(f"\n{BOLD}[12] Outputs (Lembar Isian Penilaian Bab H){RESET}")
+    # 13. Outputs
+    print(f"\n{BOLD}[13] Outputs (Lembar Isian Penilaian){RESET}")
     expected_outputs = ["VPCId", "NatGatewayId", "RDSEndpoint", "S3BucketName", "SNSTopicArn",
-                        "EC2BackendPrivateIp", "ALBDNSName", "AutoScalingGroupName", "TargetGroupArn", "EFSFileSystemId"]
+                        "EC2BackendPrivateIp", "ALBDNSName", "AutoScalingGroupName", "TargetGroupArn", "EFSFileSystemId",
+                        "EC2FrontendTempPrivateIp"]
     for out in expected_outputs:
         check(f"Output {out} tersedia", out in outputs)
 
