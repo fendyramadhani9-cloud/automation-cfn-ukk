@@ -9,11 +9,9 @@ Repository ini berisi template otomatisasi **AWS CloudFormation** dan script **C
 
 ```text
 ├── template.yaml       # Template CloudFormation lengkap (VPC, RDS, EFS, S3, SNS, EC2, ASG, ALB)
-├── test_template.py    # Script pengujian validitas sintaks & spesifikasi template (Offline/Pre-deploy)
 ├── cek_infra.py        # Script pemeriksa infrastruktur AWS otomatis
 ├── cek_fungsi.py       # Script penguji fungsional web & endpoint ALB
-├── grade.py            # Script automated grading penilaian menyeluruh
-├── requirements.txt    # Library python (boto3, requests, pyyaml, cfn-lint)
+├── requirements.txt    # Library python (boto3, requests)
 └── README.md
 ```
 
@@ -35,29 +33,17 @@ Repository ini berisi template otomatisasi **AWS CloudFormation** dan script **C
 pip install -r requirements.txt
 ```
 
-### A. Periksa Validitas Template CloudFormation (`test_template.py`):
-```bash
-python test_template.py
-```
-> Menguji seluruh parameter, resource, penamaan, tagging, IP/CIDR, routing, security group, EFS, RDS, S3 regex, ASG, Launch Template, dan UserData secara offline sebelum di-deploy.
-
-### B. Periksa Infrastruktur AWS (`cek_infra.py`):
+### A. Periksa Infrastruktur AWS (`cek_infra.py`):
 ```bash
 python cek_infra.py
 ```
 > Memeriksa VPC, 7 Subnet, IGW, NAT Gateway, Route Tables, 5 Security Groups, RDS MySQL, S3 Bucket, SNS Topic, EFS File System, EC2 Backend, Launch Template, Target Group, ALB, dan Auto Scaling Group.
 
-### C. Periksa Fungsi Aplikasi Web (`cek_fungsi.py`):
+### B. Periksa Fungsi Aplikasi Web (`cek_fungsi.py`):
 ```bash
 python cek_fungsi.py
 ```
 > Menguji respon HTTP 200 frontend melalui Application Load Balancer (ALB), health endpoint, upload ke S3, dan publish notifikasi email SNS.
-
-### D. Automated Grading Menyeluruh (`grade.py`):
-```bash
-python grade.py
-```
-> Menguji 17 aspek penilaian otomatis secara menyeluruh sesuai standar UKK (skor /100).
 
 ---
 

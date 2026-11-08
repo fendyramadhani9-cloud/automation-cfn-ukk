@@ -43,11 +43,6 @@ Parameters:
     Default: ukkce2627@smkn1bms.sch.id
     Description: 'Email endpoint untuk notifikasi SNS'
 
-  StudentIdentifier:
-    Type: String
-    Default: '15671'
-    Description: 'NIS / Username peserta untuk penamaan global unik S3'
-
 Resources:
   # ============================================================================
   # C.2 & D.1: VPC & Subnets
@@ -378,13 +373,14 @@ Resources:
           Value: mbg-rds-mysql
 
   # ============================================================================
-  # C.6 & D.4: S3 Bucket
+  # C.5 & D.4: S3 Bucket (Account Regional Namespace)
   # ============================================================================
   S3Bucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
-      BucketName: !Sub 'mbg-uploads-${StudentIdentifier}-${AWS::AccountId}-${AWS::Region}-an'
+      BucketName: !Sub 'mbg-uploads-${AWS::AccountId}-${AWS::Region}-an'
+      BucketNamespace: account-regional
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -392,7 +388,7 @@ Resources:
         RestrictPublicBuckets: true
       Tags:
         - Key: Name
-          Value: !Sub 'mbg-uploads-${StudentIdentifier}-${AWS::AccountId}-${AWS::Region}-an'
+          Value: !Sub 'mbg-uploads-${AWS::AccountId}-${AWS::Region}-an'
 
   # ============================================================================
   # C.7 & D.5: SNS Topic & Email Subscription
@@ -476,8 +472,20 @@ Resources:
           cd /var/www/html
           rm -rf * .* 2>/dev/null || true
           git clone https://github.com/ukkce2627/mbg-app-be .
+
+          # Setup Swap 2GB agar composer tidak kehabisan RAM (OOM Killer) di t3.micro (1GB RAM)
+          dd if=/dev/zero of=/swapfile bs=128M count=16
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+
+          # Install AWS SDK for PHP via Composer dengan memory limit tak terbatas
           export COMPOSER_ALLOW_SUPERUSER=1
-          composer require aws/aws-sdk-php --no-interaction
+          export COMPOSER_MEMORY_LIMIT=-1
+          for i in {1..5}; do
+            php -d memory_limit=-1 /usr/bin/composer require aws/aws-sdk-php --no-interaction --prefer-dist && break || sleep 5
+          done
 
           cat << 'EOF_CONFIG' > /var/www/html/config.php
           <?php
